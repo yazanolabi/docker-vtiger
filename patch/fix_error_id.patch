@@ -1,0 +1,17 @@
+--- /var/www/html/include/Webservices/LineItem/VtigerInventoryOperation.php.bak	2025-03-11 15:10:34.200276895 +0000
++++ /var/www/html/include/Webservices/LineItem/VtigerInventoryOperation.php	2025-03-11 15:09:55.419788335 +0000
+@@ -466,12 +466,9 @@
+ 				$focus->column_fields[$fieldName] = decode_html($fieldValue);
+ 			}
+ 		}
+-		
+-		if ($element['id']) {
+-			$ids = vtws_getIdComponents($element['id']);
+-			$focus->id = $ids[1];
+-		}
+-	
++		$ids = vtws_getIdComponents($element['id']);
++		$focus->id = $ids[1];
++
+ 		return $focus;
+ 	}

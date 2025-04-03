@@ -1,0 +1,52 @@
+version: "3.7"
+
+services:
+  crm:
+    build: .
+    labels:
+      traefik.docker.network: traefik-public
+      traefik.enable: "true"
+      traefik.http.routers.vtiger-one-http.entrypoints: http
+      traefik.http.routers.vtiger-one-http.middlewares: https-redirect
+      traefik.http.routers.vtiger-one-http.rule: Host(`crm.mabecenter.org`)
+      traefik.http.routers.vtiger-one-http.service: vtiger-one
+      traefik.http.routers.vtiger-one-https.entrypoints: https
+      traefik.http.routers.vtiger-one-https.rule: Host(`crm.mabecenter.org`)
+      traefik.http.routers.vtiger-one-https.service: vtiger-one
+      traefik.http.routers.vtiger-one-https.tls: "true"
+      traefik.http.routers.vtiger-one-https.tls.certresolver: le
+      traefik.http.services.vtiger-one.loadbalancer.server.port: "80"
+    volumes:
+      - php-data:/var/www/html
+    networks:
+      mariadb-network: null
+      vtiger-network: null
+      traefik-public: null
+
+  installer:
+    build: .
+    entrypoint:
+      - "/usr/local/bin/entrypoint.sh"
+    extra_hosts:
+      - "crm.mabecenter.org:127.0.0.1"
+    depends_on:
+      - crm
+    volumes:
+      - php-data:/var/www/html
+    networks:
+      mariadb-network: null
+      vtiger-network: null
+
+networks:
+  vtiger-network:
+    name: vtiger-one
+    external: false
+  mariadb-network:
+    name: mariadb-network
+    external: true
+  traefik-public:
+    name: traefik-public
+    external: true
+
+volumes:
+  php-data:
