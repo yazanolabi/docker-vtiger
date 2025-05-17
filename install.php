@@ -5,8 +5,9 @@
  * @author Francesco Bianco <bianco@javanile.org>
  */
 
-date_default_timezone_set('America/Los_Angeles');
+date_default_timezone_set('Asia/Dubai'); // Set timezone to Dubai
 
+// === Database Configuration ===
 define('VT_VERSION', '8.3.0');
 define('DB_TYPE', 'mysqli');
 define('DB_HOST', 'database');
@@ -22,36 +23,32 @@ require_once '/var/www/html/vendor/autoload.php';
 use Javanile\HttpRobot\HttpRobot;
 
 echo "[vtiger] Testing installation...\n";
+echo '[vtiger] Database params: '.DB_TYPE.' '.DB_HOST.' '.DB_PORT.' '.DB_NAME.' '.DB_USER."\n";
 
-echo '[vtiger] Database params: '.DB_TYPE.' '.DB_HOST.' '.DB_PORT.' '.DB_NAME.' '.DB_USER.' '.DB_PASS."\n";
 $link = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
 if (mysqli_connect_errno()) {
     echo '[vtiger] Database error: '.mysqli_connect_errno().' - '.mysqli_connect_error()."\n";
     exit(1);
 }
 
+// === Create HttpRobot instance pointing to localhost ===
 $robot = new HttpRobot([
-    'base_uri' => 'http://crm.mabecenter.org/',
+    'base_uri' => 'http://localhost/',
     'cookies'  => true,
 ]);
 
-/**
- * Get session token
- */
+// === Step 1: Get session token ===
 echo "[vtiger] (#1) Get session token";
 $values = $robot->get('index.php?module=Install&view=Index&mode=Step4', ['__vtrftk', '@text']);
 echo " -> token: '{$values['__vtrftk']}'\n";
-if (version_compare(VT_VERSION, '7.0.0', '>=')) {
-    if (empty($values['__vtrftk'])) {
-        echo " -> [ERROR] Session token not found\n";
-        echo $values['@text'];
-        exit(1);
-    }
+
+if (version_compare(VT_VERSION, '7.0.0', '>=') && empty($values['__vtrftk'])) {
+    echo " -> [ERROR] Session token not found\n";
+    echo $values['@text'];
+    exit(1);
 }
 
-/**
- * Submit installation params
- */
+// === Step 2: Send installation parameters ===
 echo "[vtiger] (#2) Sending installation parameters";
 $values = $robot->post(
     'index.php',
@@ -75,12 +72,13 @@ $values = $robot->post(
         'lastname'         => 'Administrator',
         'admin_email'      => 'vtiger@localhost.lan',
         'dateformat'       => 'dd-mm-yyyy',
-        'timezone'         => 'America/Los_Angeles',
+        'timezone'         => 'Asia/Dubai', // Set here as well
     ],
     ['__vtrftk', 'auth_key', '@text']
 );
 echo " -> form-token: '{$values['__vtrftk']}' auth-key: '{$values['auth_key']}'\n";
 
+// === Step 3: Confirm installation parameters ===
 echo "[vtiger] (#3) Confirm installation parameters";
 $values = $robot->post(
     'index.php',
@@ -95,9 +93,7 @@ $values = $robot->post(
 );
 echo " -> form-token: '{$values['__vtrftk']}' auth-key: '{$values['auth_key']}'\n";
 
-/**
- * Selecting industry
- */
+// === Step 4: Selecting industry ===
 echo "[vtiger] (#4) Selecting industry";
 $values = $robot->post(
     'index.php',
@@ -111,28 +107,26 @@ $values = $robot->post(
     ],
     ['__vtrftk', '@text']
 );
-
 echo " -> form-token: '{$values['__vtrftk']}'\n";
-if (version_compare(VT_VERSION, '7.0.0', '>=')) {
-    if (empty($values['__vtrftk'])) {
-        echo " -> [ERROR] install error on industry selector\n";
-        $mysqli = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
-        $error = mysqli_connect_error();
-        $result = mysqli_query($mysqli, "SHOW TABLES");
-        while ($table = mysqli_fetch_row($result))  {
-            echo "Table: $table[0]\n";
-        }
-        echo $values['@text'];
-        if (file_exists('/var/lib/vtiger/logs/php.log')) {
-            echo file_get_contents('/var/lib/vtiger/logs/php.log');
-        }
-        #exit(1);
+
+if (version_compare(VT_VERSION, '7.0.0', '>=') && empty($values['__vtrftk'])) {
+    echo " -> [ERROR] Error during industry selection\n";
+
+    $mysqli = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
+    $result = mysqli_query($mysqli, "SHOW TABLES");
+    while ($table = mysqli_fetch_row($result)) {
+        echo "Table: $table[0]\n";
     }
+    echo $values['@text'];
+
+    if (file_exists('/var/lib/vtiger/logs/php.log')) {
+        echo file_get_contents('/var/lib/vtiger/logs/php.log');
+    }
+    // Uncomment to stop on error
+    // exit(1);
 }
 
-/**
- * First login seems required only for >7
- */
+// === Step 5: First login ===
 echo "[vtiger] (#5) First login";
 $values = $robot->post(
     'index.php?module=Users&action=Login',
@@ -144,9 +138,7 @@ $values = $robot->post(
     ['__vtrftk', '@text']
 );
 
-/**
- * Select crm modules
- */
+// === Step 6: Select CRM modules ===
 echo "\n[vtiger] (#6) Select modules and packages";
 $values = $robot->post(
     'index.php?module=Users&action=SystemSetupSave',
@@ -161,29 +153,6 @@ $values = $robot->post(
     ],
     ['__vtrftk', '@text']
 );
-
 echo " -> form-token: '{$values['__vtrftk']}'\n";
 
-// =================================================================
-// Select Modules
-/*
-$modules = [
-    'Documents' => false,
-];
-foreach ($modules as $module => $status) {
-    echo "[vtiger] ".($status?'enable':'disable')." module '${module}': ";
-    $resp = $robot->post(
-        'index.php',
-        [
-            '__vtrftk' => $vtrftk,
-            'module' => 'ModuleManager',
-            'parent' => 'Settings',
-            'action' => 'Basic',
-            'mode' => 'updateModuleStatus',
-            'forModule' => $module,
-            'updateStatus' => $status,
-        ]
-    );
-    echo trim($resp)."\n";
-}
-*/
+echo "[vtiger] Installation completed successfully.\n";
