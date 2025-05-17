@@ -3,40 +3,44 @@ set -e
 
 cd /var/www/html
 
+# Start Apache in the background
 apache2-foreground &
 
-# Espera a que Apache esté listo
-echo "Esperando a que Apache se inicie..."
-until curl -sSf http://crm.mabecenter.org/ > /dev/null; do
-  echo "Apache aún no responde. Esperando 5 segundos..."
+# Wait for Apache to become available
+echo "Waiting for Apache to start..."
+until curl -sSf http://localhost/ > /dev/null; do
+  echo "Apache is not ready yet. Retrying in 5 seconds..."
   sleep 5
 done
-echo "Apache ya está disponible. Ejecutando el instalador..."
+echo "Apache is now available. Running the installer..."
 
-# Ejecuta el instalador
+# Run the installer
 composer require javanile/http-robot:0.0.2 --with-all-dependencies && php install.php
 
-echo "Aplicando parches desde /patch..."
-
-for patchfile in patch/*.patch; do
+# Apply patches
+echo "Applying patches from /patch..."
+if [ -d "patch" ]; then
+  for patchfile in patch/*.patch; do
     if [ -f "$patchfile" ]; then
-        echo "Ejecutando $patchfile..."
-        case "$patchfile" in
-            *add_related_field.patch*)
-                patch --batch -p4 < patch/add_related_field.patch || true
-                ;;
-            *fix_error_id.patch*)
-                patch --batch -p4 < patch/fix_error_id.patch || true
-                ;;
-            *)
-                echo "No se reconoce la ubicación para $patchfile, omitiendo"
-                ;;
-        esac
+      echo "Running $patchfile..."
+      case "$patchfile" in
+        *add_related_field.patch*)
+          patch --batch -p4 < "$patchfile" || true
+          ;;
+        *fix_error_id.patch*)
+          patch --batch -p4 < "$patchfile" || true
+          ;;
+        *)
+          echo "Unknown patch file: $patchfile, skipping"
+          ;;
+      esac
     fi
-done
+  done
+else
+  echo "No /patch directory found. Skipping patching step."
+fi
 
-sed -i 's|http://crm\.mabecenter\.org|https://crm.mabecenter.org|g' /var/www/html/config.inc.php
-
+# Optional custom script
 # php patch/ImportHelloWorld.php
 
-echo "Parches aplicados. Iniciando el servicio..."
+echo "All patches applied. Service is up."
