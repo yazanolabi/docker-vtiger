@@ -1,1 +1,1 @@
-docker compose --project-name vtiger-one  -f ~/docker-vtiger/docker-compose.yaml up -d
+docker compose -f docker-compose.yaml up -d
